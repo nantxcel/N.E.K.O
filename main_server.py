@@ -46,21 +46,43 @@ def initialize_steamworks():
     try:
         steamworks = STEAMWORKS()
         steamworks.initialize()
+        # 检查全局logger是否已初始化，如果已初始化则记录成功信息
+        if 'logger' in globals():
+            logger.info("Steamworks initialized successfully")
+        return steamworks
     except Exception as e:
-        logger.error(f"Failed to initialize Steamworks: {e}")
-
-    return steamworks
+        # 检查全局logger是否已初始化，如果已初始化则记录错误，否则使用print
+        if 'logger' in globals():
+            logger.error(f"Failed to initialize Steamworks: {e}")
+        else:
+            print(f"Failed to initialize Steamworks: {e}")
+        return None
 
 def get_default_steam_info():
-    my_steam64 = steamworks.Users.GetSteamID()
-    my_steam_level = steamworks.Users.GetPlayerSteamLevel()
-    subscribed_apps = steamworks.Workshop.GetNumSubscribedItems()
-    print(f'Subscribed apps: {subscribed_apps}')
+    global steamworks
+    # 检查steamworks是否初始化成功
+    if steamworks is None:
+        print("Steamworks not initialized. Skipping Steam functionality.")
+        if 'logger' in globals():
+            logger.info("Steamworks not initialized. Skipping Steam functionality.")
+        return
+    
+    try:
+        my_steam64 = steamworks.Users.GetSteamID()
+        my_steam_level = steamworks.Users.GetPlayerSteamLevel()
+        subscribed_apps = steamworks.Workshop.GetNumSubscribedItems()
+        print(f'Subscribed apps: {subscribed_apps}')
 
-    print(f'Logged on as {my_steam64}, level: {my_steam_level}')
-    print('Is subscribed to current app?', steamworks.Apps.IsSubscribed())
+        print(f'Logged on as {my_steam64}, level: {my_steam_level}')
+        print('Is subscribed to current app?', steamworks.Apps.IsSubscribed())
+    except Exception as e:
+        print(f"Error accessing Steamworks API: {e}")
+        if 'logger' in globals():
+            logger.error(f"Error accessing Steamworks API: {e}")
 
+# 初始化Steamworks，但即使失败也继续启动服务
 steamworks = initialize_steamworks()
+# 尝试获取Steam信息，如果失败也不会阻止服务启动
 get_default_steam_info()
 
 # Configure logging
@@ -993,6 +1015,404 @@ async def get_characters():
 @app.get('/steam_workshop_manager', response_class=HTMLResponse)
 async def steam_workshop_manager_page(request: Request, lanlan_name: str = ""):
     return templates.TemplateResponse("templates/steam_workshop_manager.html", {"request": request, "lanlan_name": lanlan_name})
+
+@app.get('/api/steam/workshop/subscribed-items')
+async def get_subscribed_workshop_items():
+    """
+    获取用户订阅的Steam创意工坊物品列表
+    返回包含物品ID、标题、描述、作者信息等的JSON数据
+    """
+    global steamworks
+    
+    # 检查Steamworks是否初始化成功
+    if steamworks is None:
+        return JSONResponse({
+            "success": False,
+            "error": "Steamworks未初始化",
+            "message": "请确保Steam客户端已运行且已登录"
+        }, status_code=503)
+    
+    try:
+        # 获取订阅物品数量
+        num_subscribed_items = steamworks.Workshop.GetNumSubscribedItems()
+        logger.info(f"获取到 {num_subscribed_items} 个订阅的创意工坊物品")
+        
+        # 如果没有订阅物品，返回空列表
+        if num_subscribed_items == 0:
+            return {
+                "success": True,
+                "items": [],
+                "total": 0
+            }
+        
+        # 获取订阅物品ID列表
+        subscribed_items = steamworks.Workshop.GetSubscribedItems()
+        
+        # 存储处理后的物品信息
+        items_info = []
+        
+        # 为每个物品获取详细信息
+        for item_id in subscribed_items:
+            try:
+                # 获取物品状态
+                item_state = steamworks.Workshop.GetItemState(item_id)
+                
+                # 创建查询请求
+                handle = steamworks.Workshop.CreateQueryUGCDetailsRequest()
+                steamworks.Workshop.AddPublishedFileIDToQuery(handle, item_id)
+                
+                # 发送查询请求
+                success = steamworks.Workshop.SendQueryUGCRequest(handle)
+                if success:
+                    # 获取查询结果
+                    result = steamworks.Workshop.GetQueryUGCResult(handle)
+                    
+                    if result:
+                        # 获取物品安装信息（如果已安装）
+                        installed, folder, size = steamworks.Workshop.GetItemInstallInfo(item_id)
+                        
+                        # 获取物品下载信息（如果正在下载）
+                        downloading, bytes_downloaded, bytes_total = steamworks.Workshop.GetItemDownloadInfo(item_id)
+                        
+                        # 构建物品信息字典
+                        item_info = {
+                            "publishedFileId": item_id,
+                            "title": result.title,
+                            "description": result.description,
+                            "steamIDOwner": result.steamIDOwner,
+                            "timeCreated": result.timeCreated,
+                            "timeUpdated": result.timeUpdated,
+                            "previewImageUrl": result.previewImageUrl,
+                            "fileUrl": result.fileUrl,
+                            "fileSize": result.fileSize,
+                            "fileId": result.fileId,
+                            "previewFileId": result.previewFileId,
+                            "appID": result.appID,
+                            "tags": [],  # SteamWorkshop类没有直接提供标签获取方法
+                            "state": {
+                                "subscribed": bool(item_state & 1),  # EItemState.SUBSCRIBED
+                                "legacyItem": bool(item_state & 2),
+                                "installed": installed,
+                                "needsUpdate": bool(item_state & 8),  # EItemState.NEEDS_UPDATE
+                                "downloading": downloading,
+                                "downloadPending": bool(item_state & 32),  # EItemState.DOWNLOAD_PENDING
+                                "isWorkshopItem": bool(item_state & 128)  # EItemState.IS_WORKSHOP_ITEM
+                            },
+                            "installedFolder": folder if installed else None,
+                            "fileSizeOnDisk": size if installed else 0,
+                            "downloadProgress": {
+                                "bytesDownloaded": bytes_downloaded if downloading else 0,
+                                "bytesTotal": bytes_total if downloading else 0,
+                                "percentage": (bytes_downloaded / bytes_total * 100) if bytes_total > 0 and downloading else 0
+                            }
+                        }
+                        
+                        items_info.append(item_info)
+                    
+                    # 释放查询句柄
+                    steamworks.Workshop.ReleaseQueryUGCRequest(handle)
+                
+            except Exception as item_error:
+                logger.error(f"获取物品 {item_id} 详细信息时出错: {item_error}")
+                # 继续处理下一个物品
+                continue
+        
+        return {
+            "success": True,
+            "items": items_info,
+            "total": len(items_info)
+        }
+        
+    except Exception as e:
+        logger.error(f"获取订阅物品列表时出错: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": f"获取订阅物品失败: {str(e)}"
+        }, status_code=500)
+
+@app.get('/api/steam/workshop/item/{item_id}')
+async def get_workshop_item_details(item_id: str):
+    """
+    获取单个Steam创意工坊物品的详细信息
+    """
+    global steamworks
+    
+    # 检查Steamworks是否初始化成功
+    if steamworks is None:
+        return JSONResponse({
+            "success": False,
+            "error": "Steamworks未初始化",
+            "message": "请确保Steam客户端已运行且已登录"
+        }, status_code=503)
+    
+    try:
+        # 转换item_id为整数
+        item_id_int = int(item_id)
+        
+        # 获取物品状态
+        item_state = steamworks.Workshop.GetItemState(item_id_int)
+        
+        # 创建查询请求
+        handle = steamworks.Workshop.CreateQueryUGCDetailsRequest()
+        steamworks.Workshop.AddPublishedFileIDToQuery(handle, item_id_int)
+        
+        # 发送查询请求
+        success = steamworks.Workshop.SendQueryUGCRequest(handle)
+        
+        if success:
+            # 获取查询结果
+            result = steamworks.Workshop.GetQueryUGCResult(handle)
+            
+            if result:
+                # 获取物品安装信息
+                installed, folder, size = steamworks.Workshop.GetItemInstallInfo(item_id_int)
+                
+                # 获取物品下载信息
+                downloading, bytes_downloaded, bytes_total = steamworks.Workshop.GetItemDownloadInfo(item_id_int)
+                
+                # 构建详细的物品信息
+                item_info = {
+                    "publishedFileId": item_id_int,
+                    "title": result.title,
+                    "description": result.description,
+                    "steamIDOwner": result.steamIDOwner,
+                    "timeCreated": result.timeCreated,
+                    "timeUpdated": result.timeUpdated,
+                    "previewImageUrl": result.previewImageUrl,
+                    "fileUrl": result.fileUrl,
+                    "fileSize": result.fileSize,
+                    "fileId": result.fileId,
+                    "previewFileId": result.previewFileId,
+                    "appID": result.appID,
+                    "tags": [],
+                    "state": {
+                        "subscribed": bool(item_state & 1),
+                        "legacyItem": bool(item_state & 2),
+                        "installed": installed,
+                        "needsUpdate": bool(item_state & 8),
+                        "downloading": downloading,
+                        "downloadPending": bool(item_state & 32),
+                        "isWorkshopItem": bool(item_state & 128)
+                    },
+                    "installedFolder": folder if installed else None,
+                    "fileSizeOnDisk": size if installed else 0,
+                    "downloadProgress": {
+                        "bytesDownloaded": bytes_downloaded if downloading else 0,
+                        "bytesTotal": bytes_total if downloading else 0,
+                        "percentage": (bytes_downloaded / bytes_total * 100) if bytes_total > 0 and downloading else 0
+                    }
+                }
+                
+                # 释放查询句柄
+                steamworks.Workshop.ReleaseQueryUGCRequest(handle)
+                
+                return {
+                    "success": True,
+                    "item": item_info
+                }
+            else:
+                # 释放查询句柄
+                steamworks.Workshop.ReleaseQueryUGCRequest(handle)
+                return JSONResponse({
+                    "success": False,
+                    "error": "获取物品详情失败，未找到物品"
+                }, status_code=404)
+        else:
+            # 释放查询句柄
+            steamworks.Workshop.ReleaseQueryUGCRequest(handle)
+            return JSONResponse({
+                "success": False,
+                "error": "发送查询请求失败"
+            }, status_code=500)
+            
+    except ValueError:
+        return JSONResponse({
+            "success": False,
+            "error": "无效的物品ID"
+        }, status_code=400)
+    except Exception as e:
+        logger.error(f"获取物品 {item_id} 详情时出错: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": f"获取物品详情失败: {str(e)}"
+        }, status_code=500)
+
+@app.post('/api/steam/workshop/unsubscribe')
+async def unsubscribe_workshop_item(request: Request):
+    """
+    取消订阅Steam创意工坊物品
+    接收包含物品ID的POST请求
+    """
+    global steamworks
+    
+    # 检查Steamworks是否初始化成功
+    if steamworks is None:
+        return JSONResponse({
+            "success": False,
+            "error": "Steamworks未初始化",
+            "message": "请确保Steam客户端已运行且已登录"
+        }, status_code=503)
+    
+    try:
+        # 获取请求体中的数据
+        data = await request.json()
+        item_id = data.get('item_id')
+        
+        if not item_id:
+            return JSONResponse({
+                "success": False,
+                "error": "缺少必要参数",
+                "message": "请求中缺少物品ID"
+            }, status_code=400)
+        
+        # 转换item_id为整数
+        try:
+            item_id_int = int(item_id)
+        except ValueError:
+            return JSONResponse({
+                "success": False,
+                "error": "无效的物品ID",
+                "message": "提供的物品ID不是有效的数字"
+            }, status_code=400)
+        
+        # 调用Steamworks的UnsubscribeItem方法
+        result = steamworks.Workshop.UnsubscribeItem(item_id_int)
+        
+        # 检查操作结果
+        if result:
+            logger.info(f"成功取消订阅物品: {item_id_int}")
+            return {
+                "success": True,
+                "message": "已成功取消订阅该物品"
+            }
+        else:
+            logger.warning(f"取消订阅物品失败: {item_id_int}")
+            return JSONResponse({
+                "success": False,
+                "error": "取消订阅失败",
+                "message": "无法取消订阅该物品，请检查物品ID是否正确"
+            }, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"取消订阅物品时出错: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": "服务器内部错误",
+            "message": f"取消订阅过程中发生错误: {str(e)}"
+        }, status_code=500)
+
+@app.post('/api/steam/workshop/publish')
+async def publish_to_workshop(request: Request):
+    """
+    上传物品到Steam创意工坊
+    接收包含物品信息的POST请求
+    """
+    global steamworks
+    
+    # 检查Steamworks是否初始化成功
+    if steamworks is None:
+        return JSONResponse({
+            "success": False,
+            "error": "Steamworks未初始化",
+            "message": "请确保Steam客户端已运行且已登录"
+        }, status_code=503)
+    
+    try:
+        # 获取请求体中的数据
+        data = await request.json()
+        
+        # 验证必要参数
+        required_fields = ['title', 'description', 'content_folder', 'preview_image']
+        for field in required_fields:
+            if field not in data:
+                return JSONResponse({
+                    "success": False,
+                    "error": "缺少必要参数",
+                    "message": f"请求中缺少{field}"
+                }, status_code=400)
+        
+        # 提取参数
+        title = data['title']
+        description = data['description']
+        content_folder = data['content_folder']
+        preview_image = data['preview_image']
+        visibility = data.get('visibility', 0)  # 默认设置为公开
+        tags = data.get('tags', [])
+        
+        # 验证文件路径是否存在
+        import os
+        if not os.path.isdir(content_folder):
+            return JSONResponse({
+                "success": False,
+                "error": "内容文件夹不存在",
+                "message": f"指定的内容文件夹不存在: {content_folder}"
+            }, status_code=400)
+        
+        if not os.path.isfile(preview_image):
+            return JSONResponse({
+                "success": False,
+                "error": "预览图片不存在",
+                "message": f"指定的预览图片不存在: {preview_image}"
+            }, status_code=400)
+        
+        # 创建新的创意工坊物品
+        logger.info(f"开始上传创意工坊物品: {title}")
+        
+        # 创建发布文件
+        try:
+            # 创建新的创意工坊物品
+            update_handle = steamworks.Workshop.CreateItem(steamworks.Apps.GetAppID(), 0)  # 0 = k_EWorkshopFileTypeFirst
+            
+            # 设置物品标题和描述
+            steamworks.Workshop.SetItemTitle(update_handle, title)
+            steamworks.Workshop.SetItemDescription(update_handle, description)
+            
+            # 设置物品内容和预览图片
+            steamworks.Workshop.SetItemContent(update_handle, content_folder)
+            steamworks.Workshop.SetItemPreview(update_handle, preview_image)
+            
+            # 设置可见性
+            steamworks.Workshop.SetItemVisibility(update_handle, visibility)
+            
+            # 添加标签（如果有）
+            for tag in tags:
+                steamworks.Workshop.AddItemKeyValueTag(update_handle, "tag", tag)
+            
+            # 提交更新
+            result, needs_to_accept_agreement = steamworks.Workshop.SubmitItemUpdate(update_handle, "初始发布")
+            
+            if result:
+                # 获取发布的物品ID
+                published_file_id = steamworks.Workshop.GetItemPublishedFileID(update_handle)
+                logger.info(f"成功上传创意工坊物品: {title}, ID: {published_file_id}")
+                return {
+                    "success": True,
+                    "message": "物品已成功上传到Steam创意工坊",
+                    "published_file_id": published_file_id,
+                    "needs_to_accept_agreement": needs_to_accept_agreement
+                }
+            else:
+                return JSONResponse({
+                    "success": False,
+                    "error": "提交更新失败",
+                    "message": "无法提交物品更新到Steam创意工坊"
+                }, status_code=500)
+                
+        except Exception as publish_error:
+            logger.error(f"上传创意工坊物品时出错: {publish_error}")
+            return JSONResponse({
+                "success": False,
+                "error": "上传过程中出错",
+                "message": str(publish_error)
+            }, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"处理创意工坊上传请求时出错: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": "服务器内部错误",
+            "message": str(e)
+        }, status_code=500)
 
 @app.get('/api/characters/current_catgirl')
 async def get_current_catgirl():
