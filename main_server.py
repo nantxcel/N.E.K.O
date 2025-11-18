@@ -1659,9 +1659,8 @@ async def get_workshop_item_details(item_id: str):
         # 获取物品状态
         item_state = steamworks.Workshop.GetItemState(item_id_int)
         
-        # 创建查询请求
-        handle = steamworks.Workshop.CreateQueryUGCDetailsRequest()
-        steamworks.Workshop.AddPublishedFileIDToQuery(handle, item_id_int)
+        # 创建查询请求，传入必要的published_file_ids参数
+        handle = steamworks.Workshop.CreateQueryUGCDetailsRequest([item_id_int])
         
         # 发送查询请求
         success = steamworks.Workshop.SendQueryUGCRequest(handle)
@@ -1749,15 +1748,13 @@ async def get_workshop_item_details(item_id: str):
                     "item": item_info
                 }
             else:
-                # 释放查询句柄
-                steamworks.Workshop.ReleaseQueryUGCRequest(handle)
+                # 注意：SteamWorkshop类中不存在ReleaseQueryUGCRequest方法
                 return JSONResponse({
                     "success": False,
                     "error": "获取物品详情失败，未找到物品"
                 }, status_code=404)
         else:
-            # 释放查询句柄
-            steamworks.Workshop.ReleaseQueryUGCRequest(handle)
+            # 注意：SteamWorkshop类中不存在ReleaseQueryUGCRequest方法
             return JSONResponse({
                 "success": False,
                 "error": "发送查询请求失败"

@@ -704,6 +704,7 @@
                         <label style="display: block; margin-bottom: 5px;">默认创意工坊文件夹路径</label>
                         <input type="text" id="default-workshop-folder" placeholder="默认创意工坊文件夹路径" style="width: 100%; padding: 8px;">
                         <small style="color: #6c757d; font-size: 0.85rem; display: block; margin-top: 3px;">未指定扫描路径时将使用此默认路径</small>
+                        <small style="color: #28a745; font-size: 0.85rem; display: block; margin-top: 3px;">提示：默认路径通常在 我的文档/Xiao8</small>
                     </div>
                     
                     <div style="margin-bottom: 15px;">
@@ -1930,7 +1931,7 @@
                                             </div>` : ''
                                         }
                                         <div class="card-actions">
-                                            <button class="button" onclick="viewItemDetails('${formattedItem.id}')">详情</button>
+                        
                                             <button class="button button-danger" onclick="unsubscribeItem('${formattedItem.id}', '${formattedItem.name}')">取消订阅</button>
                                         </div>
                                     </div>
@@ -2120,7 +2121,8 @@ function viewItemDetails(itemId) {
                 description: item.description || '暂无描述',
                 downloadCount: 'N/A',
                 rating: 'N/A',
-                tags: ['模组'] // 默认标签，实际应用中应该从API获取
+                tags: ['模组'], // 默认标签，实际应用中应该从API获取
+                state: item.state || {} // 添加state属性，确保后续代码可以正常访问
             };
             
             // 确定状态类和文本
