@@ -1663,11 +1663,13 @@ async def get_workshop_item_details(item_id: str):
         handle = steamworks.Workshop.CreateQueryUGCDetailsRequest([item_id_int])
         
         # 发送查询请求
-        success = steamworks.Workshop.SendQueryUGCRequest(handle)
+        # 注意：SendQueryUGCRequest返回None而不是布尔值
+        handle = steamworks.Workshop.SendQueryUGCRequest(handle)
         
-        if success:
-            # 获取查询结果
-            result = steamworks.Workshop.GetQueryUGCResult(handle)
+        # 检查handle是否有效而不是检查success
+        if handle is not None:
+            # 获取查询结果 - 添加index参数
+            result = steamworks.Workshop.GetQueryUGCResult(handle, 0)
             
             if result:
                 # 获取物品安装信息 - 支持字典格式（根据workshop.py的实现）
@@ -1715,12 +1717,12 @@ async def get_workshop_item_details(item_id: str):
                     "steamIDOwner": result.steamIDOwner,
                     "timeCreated": result.timeCreated,
                     "timeUpdated": result.timeUpdated,
-                    "previewImageUrl": result.previewImageUrl,
-                    "fileUrl": result.fileUrl,
+                    "previewImageUrl": result.URL,  # 使用result.URL代替不存在的previewImageUrl
+                    "fileUrl": result.URL,  # 使用result.URL代替不存在的fileUrl
                     "fileSize": result.fileSize,
-                    "fileId": result.fileId,
-                    "previewFileId": result.previewFileId,
-                    "appID": result.appID,
+                    "fileId": result.file,  # 使用result.file代替不存在的fileId
+                    "previewFileId": result.previewFile,  # 使用result.previewFile代替不存在的previewFileId
+                    # 移除不存在的appID属性
                     "tags": [],
                     "state": {
                         "subscribed": bool(item_state & 1),
@@ -1740,8 +1742,7 @@ async def get_workshop_item_details(item_id: str):
                     }
                 }
                 
-                # 释放查询句柄
-                steamworks.Workshop.ReleaseQueryUGCRequest(handle)
+                # 注意：SteamWorkshop类中不存在ReleaseQueryUGCRequest方法，无需释放句柄
                 
                 return {
                     "success": True,
@@ -1844,167 +1845,6 @@ async def unsubscribe_workshop_item(request: Request):
             "success": False,
             "error": "服务器内部错误",
             "message": f"取消订阅过程中发生错误: {str(e)}"
-        }, status_code=500)
-
-@app.post('/api/steam/workshop/publish')
-async def publish_to_workshop(request: Request):
-    """
-    上传物品到Steam创意工坊
-    接收包含物品信息的POST请求
-    """
-    global steamworks
-    
-    # 检查Steamworks是否初始化成功
-    if steamworks is None:
-        return JSONResponse({
-            "success": False,
-            "error": "Steamworks未初始化",
-            "message": "请确保Steam客户端已运行且已登录"
-        }, status_code=503)
-    
-    # 添加额外的Steam客户端连接状态检查
-    try:
-        # 检查Steam客户端是否正在运行
-        if not steamworks.IsSteamRunning():
-            return JSONResponse({
-                "success": False,
-                "error": "Steam客户端未运行",
-                "message": "请确保Steam客户端已启动并正在运行"
-            }, status_code=503)
-        
-        # 检查用户是否已登录Steam
-        if not steamworks.Utils.IsOverlayEnabled():
-            logger.warning("Steam覆盖层未启用，可能会影响创意工坊功能")
-            
-        # 尝试获取SteamID以验证连接是否正常
-        steam_id = steamworks.Users.GetSteamID()
-        if not steam_id:
-            return JSONResponse({
-                "success": False,
-                "error": "无法获取Steam用户信息",
-                "message": "请确保您已在Steam客户端中登录"
-            }, status_code=503)
-            
-        logger.info(f"Steam连接检查通过，用户ID: {steam_id}")
-        
-    except Exception as connection_error:
-        logger.error(f"Steam连接状态检查失败: {connection_error}")
-        return JSONResponse({
-            "success": False,
-            "error": "Steam连接检查失败",
-            "message": f"无法确认Steam客户端连接状态: {str(connection_error)}"
-        }, status_code=503)
-    
-    try:
-        # 获取请求体中的数据
-        data = await request.json()
-        
-        # 验证必要参数
-        required_fields = ['title', 'description', 'content_folder', 'preview_image']
-        for field in required_fields:
-            if field not in data:
-                return JSONResponse({
-                    "success": False,
-                    "error": "缺少必要参数",
-                    "message": f"请求中缺少{field}"
-                }, status_code=400)
-        
-        # 提取参数
-        title = data['title']
-        description = data['description']
-        content_folder = data['content_folder']
-        preview_image = data['preview_image']
-        visibility = data.get('visibility', 0)  # 默认设置为公开
-        tags = data.get('tags', [])
-        
-        # 验证文件路径是否存在并规范化路径
-        import os
-        
-        # 规范化路径，处理不同格式的输入
-        content_folder = os.path.normpath(content_folder)
-        preview_image = os.path.normpath(preview_image)
-        
-        # 检查内容文件夹
-        if not os.path.isdir(content_folder):
-            return JSONResponse({
-                "success": False,
-                "error": "内容文件夹不存在",
-                "message": f"指定的内容文件夹不存在: {content_folder}"
-            }, status_code=400)
-        
-        # 检查是否有读取内容文件夹的权限
-        if not os.access(content_folder, os.R_OK):
-            return JSONResponse({
-                "success": False,
-                "error": "权限不足",
-                "message": f"没有权限读取内容文件夹: {content_folder}"
-            }, status_code=403)
-        
-        # 检查预览图片
-        if not os.path.isfile(preview_image):
-            return JSONResponse({
-                "success": False,
-                "error": "预览图片不存在",
-                "message": f"指定的预览图片不存在: {preview_image}"
-            }, status_code=400)
-        
-        # 检查是否有读取预览图片的权限
-        if not os.access(preview_image, os.R_OK):
-            return JSONResponse({
-                "success": False,
-                "error": "权限不足",
-                "message": f"没有权限读取预览图片: {preview_image}"
-            }, status_code=403)
-        
-        # 确保内容文件夹中有文件（可选，但有助于避免上传空文件夹）
-        if not os.listdir(content_folder):
-            logger.warning(f"内容文件夹为空: {content_folder}")
-        
-        # 创建新的创意工坊物品
-        logger.info(f"开始上传创意工坊物品: {title}")
-        
-        # 使用辅助函数发布到创意工坊
-        try:
-            # 导入可见性枚举类型
-            from steamworks.enums import ERemoteStoragePublishedFileVisibility
-            
-            # 将整数值转换为对应的枚举对象
-            visibility_enum = ERemoteStoragePublishedFileVisibility(visibility)
-            
-            # 调用_publish_workshop_item函数，它已经正确实现了异步回调机制
-            published_file_id = _publish_workshop_item(
-                steamworks,
-                title,
-                description,
-                content_folder,
-                preview_image,
-                visibility_enum,
-                tags,
-                "初始发布"
-            )
-            
-            # _publish_workshop_item函数已经返回了发布的物品ID
-            logger.info(f"成功上传创意工坊物品: {title}, ID: {published_file_id}")
-            return JSONResponse({
-                "success": True,
-                "message": "物品已成功上传到Steam创意工坊",
-                "published_file_id": published_file_id
-            })
-                
-        except Exception as publish_error:
-            logger.error(f"上传创意工坊物品时出错: {publish_error}")
-            return JSONResponse({
-                "success": False,
-                "error": "上传过程中出错",
-                "message": str(publish_error)
-            }, status_code=500)
-            
-    except Exception as e:
-        logger.error(f"处理创意工坊上传请求时出错: {e}")
-        return JSONResponse({
-            "success": False,
-            "error": "服务器内部错误",
-            "message": str(e)
         }, status_code=500)
 
 @app.get('/api/characters/current_catgirl')
@@ -3847,12 +3687,10 @@ def _publish_workshop_item(steamworks, title, description, content_folder, previ
                         status_text = "未知"
                         if progress['status'] == EItemUpdateStatus.UPLOADING_CONTENT:
                             status_text = "上传内容"
-                        elif progress['status'] == EItemUpdateStatus.UPLOADING_PREVIEW:
+                        elif progress['status'] == EItemUpdateStatus.UPLOADING_PREVIEW_FILE:
                             status_text = "上传预览图"
                         elif progress['status'] == EItemUpdateStatus.COMMITTING_CHANGES:
                             status_text = "提交更改"
-                        elif progress['status'] == EItemUpdateStatus.PENDING_UPDATE:
-                            status_text = "等待更新"
                         
                         if 'progress' in progress:
                             current_progress = int(progress['progress'] * 100)

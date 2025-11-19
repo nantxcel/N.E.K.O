@@ -336,7 +336,7 @@ class SteamWorkshop(object):
         """Get info about an installed item
 
         :param published_file_id: int
-        :param max_path_length: str
+        :param max_path_length: int
         :return: dict
         """
         punSizeOnDisk = pointer(c_uint64(0))
@@ -350,7 +350,7 @@ class SteamWorkshop(object):
             return {}
 
         return {
-            'disk_size' : punSizeOnDisk,
+            'disk_size' : punSizeOnDisk.contents.value,  # 解包为数值而不是返回指针
             'folder' : pchFolder.value.decode(),
             'timestamp' : punTimeStamp.contents.value
         }

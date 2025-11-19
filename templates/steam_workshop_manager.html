@@ -1026,7 +1026,7 @@
             })
             .then(data => {
                 // 检查是否使用了默认路径
-                const defaultPathUsed = data.default_path_used || usingDefaultPath;
+                const defaultPathUsed = !!data.default_path_used;
                 
                 if (data.success) {
                     // 获取本地物品列表和创意工坊已发布物品信息
@@ -1202,7 +1202,7 @@
                             ${!isPublished ? `
                                 <div class="card-actions">
                                 <button class="button" onclick="prepareItemForUpload('${item.id}', '${encodeURIComponent(item.path.replace(/\\/g, '/'))}')">准备上传</button>
-                                <button class="button button-primary" onclick="quickUploadItem('${item.id}', '${encodeURIComponent(item.path.replace(/\\/g, '/'))}')">快速上传</button>
+                                <button class="button button-primary" onclick="quickUploadItem(event, '${item.id}', '${encodeURIComponent(item.path.replace(/\\/g, '/'))}')">快速上传</button>
                             </div>
                             ` : `
                                 <div class="card-actions">
@@ -1255,10 +1255,11 @@
         }
         
         // 快速上传物品
-        async function quickUploadItem(itemId, folderPath) {
+        async function quickUploadItem(event, itemId, folderPath) {
+            let button = null;
             try {
                 // 显示上传中状态
-                const button = event.target;
+                button = event?.target || null;
                 if (button) {
                     button.disabled = true;
                     button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 上传中...';
