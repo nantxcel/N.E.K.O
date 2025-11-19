@@ -219,6 +219,7 @@ steamworks = initialize_steamworks()
 # 尝试获取Steam信息，如果失败也不会阻止服务启动
 get_default_steam_info()
 
+
 # Configure logging
 from utils.logger_config import setup_logging
 
@@ -419,6 +420,7 @@ async def save_preferences(request: Request):
         return {"success": False, "error": str(e)}
 
 
+
 @app.get("/api/live2d/models")
 async def get_live2d_models(simple: bool = False):
     """
@@ -427,7 +429,65 @@ async def get_live2d_models(simple: bool = False):
         simple: 如果为True，只返回模型名称列表；如果为False，返回完整的模型信息
     """
     try:
+        # 先获取本地模型
         models = find_models()
+        
+        # 再获取Steam创意工坊模型
+        try:
+            workshop_items_result = await get_subscribed_workshop_items()
+            
+            # 处理响应结果
+            if isinstance(workshop_items_result, dict) and workshop_items_result.get('success', False):
+                items = workshop_items_result.get('items', [])
+                logger.info(f"获取到{len(items)}个订阅的创意工坊物品")
+                
+                # 遍历所有物品，提取已安装的模型
+                for item in items:
+                    # 直接使用get_subscribed_workshop_items返回的installedFolder
+                    installed_folder = item.get('installedFolder')
+                    # 从publishedFileId字段获取物品ID，而不是item_id
+                    item_id = item.get('publishedFileId')
+                    
+                    if installed_folder and os.path.exists(installed_folder) and os.path.isdir(installed_folder) and item_id:
+                        # 检查安装目录下是否有.model3.json文件
+                        for filename in os.listdir(installed_folder):
+                            if filename.endswith('.model3.json'):
+                                model_name = os.path.splitext(os.path.splitext(filename)[0])[0]
+                                
+                                # 避免重复添加
+                                if model_name not in [m['name'] for m in models]:
+                                    # 构建正确的/workshop URL路径，确保没有多余的引号
+                                    path_value = f'/workshop/{item_id}/{filename}'
+                                    logger.debug(f"添加模型路径: {path_value!r}, item_id类型: {type(item_id)}, filename类型: {type(filename)}")
+                                    # 移除可能的额外引号
+                                    path_value = path_value.strip('"')
+                                    models.append({
+                                        'name': model_name,
+                                        'path': path_value,
+                                        'source': 'steam_workshop'
+                                    })
+                            
+                        # 检查安装目录下的子目录
+                        for subdir in os.listdir(installed_folder):
+                            subdir_path = os.path.join(installed_folder, subdir)
+                            if os.path.isdir(subdir_path):
+                                model_name = subdir
+                                json_file = os.path.join(subdir_path, f'{model_name}.model3.json')
+                                if os.path.exists(json_file):
+                                    # 避免重复添加
+                                    if model_name not in [m['name'] for m in models]:
+                                        # 构建正确的/workshop URL路径，确保没有多余的引号
+                                        path_value = f'/workshop/{item_id}/{model_name}/{model_name}.model3.json'
+                                        logger.debug(f"添加子目录模型路径: {path_value!r}, item_id类型: {type(item_id)}, model_name类型: {type(model_name)}")
+                                        # 移除可能的额外引号
+                                        path_value = path_value.strip('"')
+                                        models.append({
+                                            'name': model_name,
+                                            'path': path_value,
+                                            'source': 'steam_workshop'
+                                        })
+        except Exception as e:
+            logger.error(f"获取创意工坊模型时出错: {e}")
         
         if simple:
             # 只返回模型名称列表
@@ -442,6 +502,7 @@ async def get_live2d_models(simple: bool = False):
             return {"success": False, "error": str(e)}
         else:
             return []
+
 
 @app.get("/api/models")
 async def get_models_legacy():
@@ -1524,6 +1585,60 @@ async def get_subscribed_workshop_items():
             "success": False,
             "error": f"获取订阅物品失败: {str(e)}"
         }, status_code=500)
+
+# 使用get_subscribed_workshop_items获取第一个物品的installedFolder
+def get_workshop_root() -> str:
+    try:
+        # 尝试获取get_subscribed_workshop_items函数引用
+        subscribed_items_func = globals().get('get_subscribed_workshop_items')
+        if subscribed_items_func:
+            # 使用asyncio.run()来运行异步函数
+            workshop_items_result = asyncio.run(subscribed_items_func())
+            if isinstance(workshop_items_result, dict) and workshop_items_result.get('success', False):
+                items = workshop_items_result.get('items', [])
+                if items:
+                    first_item = items[0]
+                    WORKSHOP_PATH_FIRST = first_item.get('installedFolder')
+                    if WORKSHOP_PATH_FIRST:
+                        logger.info(f"成功获取第一个创意工坊物品的安装目录: {WORKSHOP_PATH_FIRST}")
+                        p = pathlib.Path(WORKSHOP_PATH_FIRST)
+                        # 确保目录存在
+                        if p.parent.exists():
+                            return str(p.parent)
+                        else:
+                            logger.warning(f"计算得到的创意工坊根目录不存在: {p.parent}")
+                    else:
+                        logger.warning("第一个创意工坊物品没有安装目录")
+                else:
+                    logger.warning("未找到任何订阅的创意工坊物品")
+            else:
+                logger.error("获取订阅的创意工坊物品失败")
+        else:
+            logger.warning("get_subscribed_workshop_items函数尚未定义，使用默认路径")
+    except Exception as e:
+        logger.error(f"获取创意工坊物品列表时出错: {e}")
+    
+    # 返回默认的创意工坊文件夹路径作为后备
+    default_path = workshop_config.get("default_workshop_folder", DEFAULT_WORKSHOP_FOLDER)
+    logger.info(f"使用默认创意工坊路径: {default_path}")
+    # 确保默认路径存在
+    ensure_workshop_folder_exists(default_path)
+    return default_path
+
+WORKSHOP_PATH = get_workshop_root()
+
+# 确保WORKSHOP_PATH是有效路径后再挂载
+if os.path.exists(WORKSHOP_PATH) and os.path.isdir(WORKSHOP_PATH):
+    try:
+        # 直接挂载，不使用嵌套函数装饰器
+        workshop_mount = app.mount("/workshop", StaticFiles(directory=WORKSHOP_PATH), name="workshop")
+        logger.info(f"成功挂载创意工坊目录: {WORKSHOP_PATH}")
+    except Exception as e:
+        logger.error(f"挂载创意工坊目录失败: {e}")
+else:
+    logger.warning(f"创意工坊目录不存在或不是有效的目录: {WORKSHOP_PATH}，跳过挂载")
+
+
 
 @app.get('/api/steam/workshop/item/{item_id}/path')
 async def get_workshop_item_path(item_id: str):
@@ -3655,29 +3770,6 @@ def _publish_workshop_item(steamworks, title, description, content_folder, previ
         logger.error(f"发布创意工坊物品时出错: {e}")
         raise
 
-@app.get('/api/steam/workshop/subscribed-items')
-async def get_subscribed_workshop_items():
-    try:
-        # 模拟获取已订阅的创意工坊物品
-        # 实际应用中应该使用Steamworks API获取
-        items = [
-            {
-                "publishedfileid": "1234567890",
-                "title": "示例模组1",
-                "time_created": 1620000000,
-                "time_updated": 1620000000,
-                "author": {
-                    "steamid": "76561198000000000",
-                    "personaname": "测试作者"
-                }
-            }
-        ]
-        
-        return JSONResponse(content={"success": True, "items": items})
-        
-    except Exception as e:
-        logger.error(f"获取订阅的创意工坊物品失败: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 @app.get('/api/file-exists')
 async def check_file_exists(path: str = None):
