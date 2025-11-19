@@ -805,115 +805,6 @@
         
         // 本地物品区域切换功能
         // 检查文件是否存在
-            /* 注释掉重复函数定义 - 保留第二个版本（第1061行开始）
-            async function doesFileExist(filePath) {
-                try {
-                    const response = await fetch(`/api/file-exists?path=${encodeURIComponent(filePath)}`);
-                    const result = await response.json();
-                    return result.exists;
-                } catch (error) {
-                    // 如果API不可用，返回false
-                    return false;
-                }
-            }
-            
-            // 查找预览图片
-            async function findPreviewImage(folderPath) {
-                try {
-                    // 只使用指定的预览图片文件列表
-                    const commonImageNames = ['preview.jpg', 'preview.png', 'thumbnail.jpg', 'thumbnail.png', 'icon.jpg', 'icon.png', 'header.jpg', 'header.png'];
-                    
-                    for (const imageName of commonImageNames) {
-                        const imagePath = `${folderPath}/${imageName}`;
-                        if (await doesFileExist(imagePath)) {
-                            return imagePath;
-                        }
-                    }
-                } catch (error) {
-                    console.error('查找预览图片失败:', error);
-                }
-                
-                return null;
-            }
-            
-            // 格式化日期
-            function formatDate(date) {
-                return new Date(date).toLocaleString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            }
-            
-            // 创意工坊物品对比
-            async function compareLocalWithWorkshop(localItem) {
-                try {
-                    // 获取已发布的创意工坊物品
-                    const workshopItems = await getWorkshopItems();
-                    
-                    // 比较名称
-                    for (const workshopItem of workshopItems) {
-                        if (areNamesSimilar(localItem.name, workshopItem.title)) {
-                            return {
-                                exists: true,
-                                item: workshopItem,
-                                reason: '名称相似'
-                            };
-                        }
-                    }
-                } catch (error) {
-                    console.error('创意工坊对比失败:', error);
-                }
-                
-                return { exists: false };
-            }
-            
-            // 检查名称是否相似
-            function areNamesSimilar(name1, name2) {
-                // 简单的相似度检查，可以根据需要改进
-                name1 = name1.toLowerCase().trim();
-                name2 = name2.toLowerCase().trim();
-                
-                // 如果完全相同，直接返回true
-                if (name1 === name2) return true;
-                
-                // 如果一个名称包含另一个名称
-                if (name1.includes(name2) || name2.includes(name1)) return true;
-                
-                // 计算编辑距离（简单版本）
-                if (Math.abs(name1.length - name2.length) > 3) return false;
-                
-                return false;
-            }
-            
-            // 获取创意工坊物品列表
-            async function getWorkshopItems() {
-                try {
-                    const response = await fetch('/api/steam/workshop/subscribed-items');
-                    const data = await response.json();
-                    if (data.success) {
-                        return data.items;
-                    }
-                } catch (error) {
-                    console.error('获取创意工坊物品失败:', error);
-                }
-                return [];
-            }
-            
-            // 格式化日期时间（完整版本）
-            function formatDate(date) {
-                if (!date) return '未知';
-                return new Date(date).toLocaleString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            }
-            */
             
             function toggleLocalItemsSection() {
             const localItemsSection = document.getElementById('local-items');
@@ -1202,23 +1093,22 @@
                 // 确保Windows路径中的反斜杠正确编码
                 const previewUrl = item.previewImage ? `/api/proxy-image?image_path=${encodeURIComponent(item.previewImage.replace(/\\/g, '/'))}` : '../static/icons/Steam_icon_logo.png';
                 
-                // 生成卡片HTML
+                // 生成卡片HTML，对所有用户输入进行转义以防止XSS攻击
                 return `
                     <div class="workshop-card">
-                        <img src="${previewUrl}" alt="${item.name || '本地物品'}" class="card-image">
+                        <img src="${previewUrl}" alt="${escapeHtml(item.name || '本地物品')}" class="card-image">
                         <div class="card-content">
-                            <h3 class="card-title">${item.name || '未命名物品'}</h3>
+                            <h3 class="card-title">${escapeHtml(item.name || '未命名物品')}</h3>
                             <div class="status-badge ${statusClass}">${statusText}</div>
-                            <div class="card-info">路径: ${item.path}</div>
+                            <div class="card-info">路径: ${escapeHtml(item.path)}</div>
                             <div class="card-info">修改日期: ${formatDate(item.lastModified)}</div>
                             <div class="card-info">大小: ${formatFileSize(item.size)}</div>
                             
                             ${!isPublished ? `
                                 <div class="card-actions">
-                                    <button class="button" onclick="prepareItemForUpload('${item.id}', '${encodeURIComponent(item.path.replace(/\\\\/g, '/'))}')">准备上传</button>
-                                    <button class="button button-primary" onclick="quickUploadItem(event, '${item.id}', '${encodeURIComponent(item.path.replace(/\\\\/g, '/'))}')">快速上传</button>
-                                </div>
-                            ` : `
+                                    <button class="button" onclick="prepareItemForUpload('${escapeHtml(item.id).replace(/'/g, '&#39;')}', '${encodeURIComponent(item.path.replace(/\\/g, '/'))}')">准备上传</button>
+                                    <button class="button button-primary" onclick="quickUploadItem(event, '${escapeHtml(item.id).replace(/'/g, '&#39;')}', '${encodeURIComponent(item.path.replace(/\\/g, '/'))}')">快速上传</button>
+                                </div>` : `
                                 <div class="card-actions">
                                     <button class="button button-disabled" disabled>已发布</button>
                                 </div>
