@@ -3063,11 +3063,29 @@ async def get_model_files_by_id(model_id: str):
         # 搜索表情文件
         search_files_recursive(model_dir, '.exp3.json', expression_files)
         
+        # 查找模型配置文件（model3.json）
+        model_config_file = None
+        for file in os.listdir(model_dir):
+            if file.endswith('.model3.json'):
+                model_config_file = file
+                break
+        
+        # 构建模型配置文件的URL
+        model_config_url = None
+        if model_config_file and url_prefix:
+            # 对于workshop模型，需要在URL中包含item_id
+            if url_prefix == '/workshop':
+                model_config_url = f"{url_prefix}/{model_id}/{model_config_file}"
+            else:
+                model_config_url = f"{url_prefix}/{model_config_file}"
+            logger.debug(f"为模型 {model_id} 构建的配置URL: {model_config_url}")
+        
         logger.info(f"文件统计: {len(motion_files)} 个动作文件, {len(expression_files)} 个表情文件")
         return {
             "success": True, 
             "motion_files": motion_files,
-            "expression_files": expression_files
+            "expression_files": expression_files,
+            "model_config_url": model_config_url
         }
     except Exception as e:
         logger.error(f"获取模型文件列表失败: {e}")

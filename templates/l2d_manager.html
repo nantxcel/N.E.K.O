@@ -561,11 +561,14 @@
 
                 // 2. Fetch model config
                 let modelJsonUrl;
-                // 只有当finalSteamId是有效的非undefined值时才使用它构建URL
-                if (finalSteamId && finalSteamId !== 'undefined') {
-                    // 如果提供了finalSteamId，使用专门的API端点获取模型配置
+                // 优先使用后端返回的model_config_url（如果有）
+                if (filesData.model_config_url) {
+                    modelJsonUrl = filesData.model_config_url;
+                    console.log('使用后端返回的模型配置URL:', modelJsonUrl);
+                } else if (finalSteamId && finalSteamId !== 'undefined') {
+                    // 如果提供了finalSteamId但没有model_config_url，使用原来的方式构建URL（兼容模式）
                     modelJsonUrl = `/workshop/${finalSteamId}/${modelName}.model3.json`;
-                    console.log('构建的模型URL(带steam_id):', modelJsonUrl);
+                    console.log('兼容模式 - 构建的模型URL(带steam_id):', modelJsonUrl);
                 } else {
                     // 否则使用原来的路径
                     modelJsonUrl = modelInfo.path;
@@ -1049,7 +1052,7 @@
                 const params = new URLSearchParams();
                 
                 if (lanlanName) {
-                    params.append('catgirl_name', encodeURIComponent(lanlanName));
+                    params.append('catgirl_name', lanlanName);
                 }
                 
                 // 如果有item_id，添加到参数中
@@ -1076,8 +1079,6 @@
                 }
                 
                 const { catgirl_name, model_name, model_info } = currentModelData;
-                // 解码URL编码的角色名称
-                const decodedCatgirlName = decodeURIComponent(catgirl_name);
                 
                 if (model_name && model_info) {
                     // 如果角色有设置的模型，自动加载

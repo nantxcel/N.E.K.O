@@ -117,24 +117,33 @@ def ensure_workshop_folder_exists(folder_path: Optional[str] = None) -> bool:
     except Exception:
         pass
     
-    if not os.path.exists(target_folder):
-        if workshop_config.get("auto_create_folder", True):
-            try:
-                # 使用exist_ok=True确保即使中间目录不存在也能创建
-                os.makedirs(target_folder, exist_ok=True)
-                return True
-            except Exception as e:
-                error_msg = f"创建创意工坊文件夹失败: {e}"
-                print(error_msg)
-                # 尝试使用logger记录错误
-                try:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(error_msg)
-                except Exception:
-                    pass
-                return False
-    return True
+    # 如果文件夹存在，直接返回True
+    if os.path.exists(target_folder):
+        return True
+    
+    # 如果文件夹不存在，检查是否允许自动创建
+    auto_create = workshop_config.get("auto_create_folder", True)
+    
+    # 如果不允许自动创建，明确返回False
+    if not auto_create:
+        return False
+    
+    # 如果允许自动创建，尝试创建文件夹
+    try:
+        # 使用exist_ok=True确保即使中间目录不存在也能创建
+        os.makedirs(target_folder, exist_ok=True)
+        return True
+    except Exception as e:
+        error_msg = f"创建创意工坊文件夹失败: {e}"
+        print(error_msg)
+        # 尝试使用logger记录错误
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(error_msg)
+        except Exception:
+            pass
+        return False
 
 def get_workshop_root(globals_dict: Optional[Dict[str, Any]] = None) -> str:
     """

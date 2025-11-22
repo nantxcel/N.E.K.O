@@ -336,8 +336,9 @@ def find_workshop_item_by_id(item_id: str) -> tuple:
             for subdir in os.listdir(item_path):
                 subdir_path = os.path.join(item_path, subdir)
                 if os.path.isdir(subdir_path):
+                    # 检查子文件夹中是否有模型文件
                     if any(file.endswith('.model3.json') for file in os.listdir(subdir_path)):
-                        return (subdir_path, '/workshop')
+                        return (item_path, '/workshop')
         
         # 如果找不到匹配的文件夹，返回默认路径
         default_path = os.path.join(workshop_dir, item_id)
@@ -381,7 +382,7 @@ def find_model_by_workshop_item_id(item_id: str) -> str:
             # 优先返回与文件夹同名的模型文件
             folder_name = os.path.basename(model_dir)
             for model_file in model_files:
-                if folder_name + '.model3.json' in model_file:
+                if model_file.endswith(f"{folder_name}.model3.json"):
                     return f"{url_prefix}/{item_id}/{model_file}"
             # 否则返回第一个找到的模型文件
             return f"{url_prefix}/{item_id}/{model_files[0]}"

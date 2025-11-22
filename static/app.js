@@ -2102,9 +2102,9 @@ function init_app(){
                 
                 // 页面链接
                 const links = [
-                    { href: `/memory_browser`, textKey: 'settings.menu.memoryManage', text: window.t ? window.t('settings.menu.memoryManage') : '📝 记忆管理' },
-                    { href: `/chara_manager`, textKey: 'settings.menu.characterSettings', text: window.t ? window.t('settings.menu.characterSettings') : '👤 角色设置' },
-                    { href: `/l2d?lanlan_name=${lanlan_config.lanlan_name}`, textKey: 'settings.menu.live2dManage', text: window.t ? window.t('settings.menu.live2dManage') : '🎨 Live2D管理' },
+                    { href: `/memory_browser`, text: '📝 记忆管理' },
+                    { href: `/chara_manager`, text: '👤 角色设置' },
+                    { href: `/l2d?lanlan_name=${lanlan_config.lanlan_name}`, text: '🎨 Live2D管理' },
                     { href: `/api_key`, textKey: 'settings.menu.apiSettings', text: window.t ? window.t('settings.menu.apiSettings') : '🔑 API设置' },
                     { href: `/steam_workshop_manager`, text: 'steam创意工坊' }
                 ];
