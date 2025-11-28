@@ -1176,15 +1176,17 @@
         
         /* 小窗口特定样式类 */
         .tabs.compact .tab {
-            flex: none;
+            flex: 1;
             width: auto;
-            min-width: 90px;
             padding: 10px 15px;
+            text-align: center;
         }
         
         .tabs.compact {
             justify-content: flex-start;
             gap: 4px;
+            /* 自适应左侧菜单宽度 */
+            width: 100%;
         }
         
         /* 恢复大窗口样式的类 */
@@ -1237,7 +1239,6 @@
                 <div class="tabs compact" id="workshop-tabs">
                     <button class="tab active" onclick="switchTab('subscriptions-content')">订阅内容</button>
                     <button class="tab" onclick="switchTab('local-items-content')">本地内容</button>
-                    <button class="tab" onclick="switchTab('upload-content')">上传内容</button>
                 </div>
                 
                 <!-- 修复的自定义tooltip实现 -->
@@ -1376,16 +1377,7 @@
                 </div>
             </div>
             
-            <div class="config-section">
-                <div class="control-group">
-                    <div class="control-label">每页显示</div>
-                    <select id="page-size" class="control-select" onchange="updatePageSize()">
-                        <option value="12">12</option>
-                        <option value="24">24</option>
-                        <option value="48">48</option>
-                    </select>
-                </div>
-            </div>
+
         </div>
         
         <!-- 主内容区域 -->
@@ -1440,6 +1432,53 @@
             </div>
             <!-- 本地内容标签页 -->
             <div id="local-items-content" class="tab-content" style="display: none;">
+                <!-- 上传表单区域 - 默认隐藏 -->
+                <div class="section-card upload-section" style="display: none;">
+                    <div class="section-header">
+                        <h2>上传到创意工坊</h2>
+                    </div>
+                    <div class="info-box">
+                        <p>请先在"管理本地物品"区域选择一个未发布的物品，然后点击"准备上传"按钮。内容文件夹路径和预览图片路径将自动填充。</p>
+                    </div>
+                    
+                    <div id="message-area"></div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">标题 *</div>
+                        <input type="text" id="item-title" class="control-input" placeholder="输入您的创作标题">
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">描述</div>
+                        <textarea id="item-description" class="control-input" placeholder="详细描述您的创作内容..."></textarea>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">内容文件夹路径 *</div>
+                        <input type="text" id="content-folder" class="control-input" placeholder="从本地物品中获取的内容文件夹路径" readonly>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">预览图片路径 *</div>
+                        <input type="text" id="preview-image" class="control-input" placeholder="从本地物品中获取的预览图片路径" readonly>
+                    </div>
+                    
+                    <div class="control-group">
+                        <div class="control-label">标签</div>
+                        <input type="text" id="item-tags" class="control-input" placeholder="输入标签，按回车添加">
+                        <div id="tags-container" class="tags-container"></div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <button class="btn btn-primary" onclick="uploadToWorkshop()">
+                            上传到创意工坊
+                        </button>
+                        <button class="btn btn-secondary" onclick="toggleUploadSection()">
+                            隐藏上传区
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="section-card">
                     <div class="section-header">
                         <h2>管理本地物品</h2>
@@ -1503,7 +1542,7 @@
         
             <!-- 上传内容标签页 -->
             <div id="upload-content" class="tab-content" style="display: none;">
-                <div class="section-card">
+                <div class="section-card upload-section">
                     <div class="section-header">
                         <h2>上传到创意工坊</h2>
                     </div>
@@ -1575,18 +1614,19 @@
     </div>
 
     <script>
-        // 上传区域切换功能 - 修改为标签页切换
+        // 上传区域切换功能
         function toggleUploadSection() {
-            // 检查当前是否显示的是上传内容标签页
-            const uploadContentTab = document.getElementById('upload-content');
-            const isUploadTabVisible = uploadContentTab && uploadContentTab.style.display !== 'none';
-            
-            if (isUploadTabVisible) {
-                // 如果当前是上传标签页，则切换到订阅内容标签页
-                switchTab('subscriptions-content');
-            } else {
-                // 否则切换到上传内容标签页
-                switchTab('upload-content');
+            // 查找上传表单区域
+            const uploadFormSection = document.querySelector('.upload-section');
+            if (uploadFormSection) {
+                // 切换上传表单的显示/隐藏
+                if (uploadFormSection.style.display === 'none' || uploadFormSection.style.display === '') {
+                    uploadFormSection.style.display = 'block';
+                    // 滚动到上传表单区域
+                    uploadFormSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    uploadFormSection.style.display = 'none';
+                }
             }
         }
         
@@ -1622,6 +1662,7 @@
         
         // 标签页切换功能
         function switchTab(tabId) {
+            
             // 隐藏所有标签内容
             const tabContents = document.querySelectorAll('.tab-content');
             tabContents.forEach(content => {
@@ -1682,6 +1723,12 @@
                     if (toggleButton) {
                         toggleButton.textContent = '隐藏本地物品';
                     }
+                }
+                
+                // 确保上传表单区域初始隐藏
+                const uploadFormSection = document.querySelector('.upload-section');
+                if (uploadFormSection) {
+                    uploadFormSection.style.display = 'none';
                 }
             }
         }
@@ -1806,61 +1853,86 @@
         
         // 扫描本地物品 - 现在仅使用默认路径
         function scanLocalItems() {
-            // 直接使用默认路径，不再接受用户输入的路径
-            showMessage('正在扫描默认创意工坊路径...', 'info');
+            console.log('开始扫描本地物品...');
+            
+            // 显示扫描开始提示
+            const startMessage = showMessage('正在扫描默认创意工坊路径...', 'info');
+            console.log('已显示扫描开始提示');
             
             // 调用API扫描本地文件夹中的物品
-            console.log('正在调用API扫描本地物品，使用默认路径');
-            
-            // 准备请求数据 - 空对象表示使用默认路径
-            const requestData = {};
-            console.log('请求数据:', requestData);
-            
             fetch('/api/steam/workshop/local-items/scan', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(requestData)
+                body: JSON.stringify({})
             })
             .then(response => {
-                console.log('API响应状态码:', response.status);
                 if (!response.ok) {
-                    console.error('API请求失败，状态码:', response.status);
                     throw new Error(`HTTP错误，状态码: ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
-                // 检查是否使用了默认路径
-                const defaultPathUsed = !!data.default_path_used;
+                console.log('扫描完成，数据返回:', data);
                 
                 if (data.success) {
-                    // 获取本地物品列表和创意工坊已发布物品信息
+                    // 获取本地物品列表
                     const localItems = data.local_items || [];
                     const publishedItems = data.published_items || [];
                     
                     // 更新UI显示本地物品
                     displayLocalItems(localItems, publishedItems);
                     
-                    // 构建成功消息
-                    let successMessage = `成功扫描到 ${localItems.length} 个本地物品`;
-                    if (defaultPathUsed && data.folder_path) {
-                        successMessage += ` (使用默认路径: ${data.folder_path})`;
-                    }
-                    showMessage(successMessage, 'success');
+                    // 直接显示扫描完成提示，使用简单清晰的消息
+                    const successMessage = `✅ 扫描完成！发现 ${localItems.length} 个本地物品`;
+                    console.log('准备显示成功提示:', successMessage);
+                    
+                    // 使用独立的提示元素，确保与开始提示分开
+                    const messageElement = document.createElement('div');
+                    messageElement.innerHTML = successMessage;
+                    messageElement.style.cssText = `
+                        position: fixed;
+                        top: 60px;
+                        right: 20px;
+                        padding: 15px 20px;
+                        background: #e8f5e9;
+                        color: #2e7d32;
+                        border-radius: 6px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                        z-index: 99999;
+                        font-weight: bold;
+                        opacity: 0;
+                        transform: translateY(-10px);
+                        transition: opacity 0.3s ease, transform 0.3s ease;
+                    `;
+                    
+                    document.body.appendChild(messageElement);
+                    
+                    // 触发动画
+                    setTimeout(() => {
+                        messageElement.style.opacity = '1';
+                        messageElement.style.transform = 'translateY(0)';
+                    }, 10);
+                    
+                    // 5秒后自动消失
+                    setTimeout(() => {
+                        messageElement.style.opacity = '0';
+                        messageElement.style.transform = 'translateY(-10px)';
+                        setTimeout(() => {
+                            messageElement.remove();
+                        }, 300);
+                    }, 3000);
+                    
+                    console.log('成功提示已显示');
                 } else {
-                    // 构建错误消息
-                    let errorMessage = `扫描失败: ${data.error || '未知错误'}`;
-                    if (defaultPathUsed) {
-                        errorMessage += ' (尝试使用默认路径)';
-                    }
-                    showMessage(errorMessage, 'error');
+                    const errorMessage = `❌ 扫描失败: ${data.error || '未知错误'}`;
+                    showMessage(errorMessage, 'error', 3000);
                 }
             })
             .catch(error => {
                 console.error('扫描本地物品失败:', error);
-                showMessage(`扫描过程中发生错误: ${error.message}`, 'error');
+                showMessage(`❌ 扫描错误: ${error.message}`, 'error', 3000);
             });
         }
         
@@ -2012,7 +2084,7 @@
                             
                             ${!isPublished ? `
                                 <div class="card-actions">
-                                    <button class="button button-primary" onclick="prepareItemForUpload('${escapeHtml(item.id).replace(/'/g, '&#39;')}', '${encodeURIComponent(item.path.replace(/\\/g, '/'))}')">准备上传</button>
+                                    <button class="button button-primary" onclick="prepareItemForUpload('${escapeHtml(item.id).replace(/'/g, '&#39;')}', '${encodeURIComponent(item.path.replace(/\\/g, '/'))}')">上传到创意工坊</button>
                                 </div>` : `
                                 <div class="card-actions">
                                     <button class="button button-disabled" disabled>已发布</button>
@@ -2309,10 +2381,11 @@
             messageArea.style.top = '20px';
             messageArea.style.right = '20px';
             messageArea.style.maxWidth = '400px';
-            messageArea.style.zIndex = '10000';
+            messageArea.style.zIndex = '99999'; // 增加z-index确保显示在最顶层
             messageArea.style.display = 'flex';
             messageArea.style.flexDirection = 'column';
             messageArea.style.alignItems = 'flex-end';
+            messageArea.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'; // 添加阴影增强可见性
             
             // 关闭按钮样式
             closeButton.style.position = 'absolute';
