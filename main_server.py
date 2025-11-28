@@ -61,6 +61,10 @@ from config.prompts_sys import emotion_analysis_prompt, proactive_chat_prompt
 import glob
 from utils.config_manager import get_config_manager
 
+os.add_dll_directory(os.getcwd())
+from steamworks import STEAMWORKS
+from steamworks.exceptions import SteamNotLoadedException
+from steamworks.enums import EWorkshopFileType, EItemUpdateStatus
 # 确定 templates 目录位置（支持 PyInstaller/Nuitka 打包）
 if getattr(sys, 'frozen', False):
     # 打包后运行
@@ -351,6 +355,54 @@ async def save_preferences(request: Request):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+
+@app.get("/api/steam_language")
+async def get_steam_language():
+    """获取 Steam 客户端的语言设置，用于前端 i18n 初始化"""
+    global steamworks
+    
+    # Steam 语言代码到 i18n 语言代码的映射
+    # 参考: https://partner.steamgames.com/doc/store/localization/languages
+    STEAM_TO_I18N_MAP = {
+        'schinese': 'zh-CN',      # 简体中文
+        'tchinese': 'zh-CN',      # 繁体中文（映射到简体中文，因为目前只支持 zh-CN）
+        'english': 'en',          # 英文
+        # 其他语言默认映射到英文
+    }
+    
+    try:
+        if steamworks is None:
+            return {
+                "success": False,
+                "error": "Steamworks 未初始化",
+                "steam_language": None,
+                "i18n_language": None
+            }
+        
+        # 获取 Steam 当前游戏语言
+        steam_language = steamworks.Apps.GetCurrentGameLanguage()
+        # Steam API 可能返回 bytes，需要解码为字符串
+        if isinstance(steam_language, bytes):
+            steam_language = steam_language.decode('utf-8')
+        
+        # 映射到 i18n 语言代码
+        i18n_language = STEAM_TO_I18N_MAP.get(steam_language, 'en')  # 默认英文
+        logger.info(f"[i18n] Steam 语言映射: '{steam_language}' -> '{i18n_language}'")
+        
+        return {
+            "success": True,
+            "steam_language": steam_language,
+            "i18n_language": i18n_language
+        }
+        
+    except Exception as e:
+        logger.error(f"获取 Steam 语言设置失败: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "steam_language": None,
+            "i18n_language": None
+        }
 
 
 @app.get("/api/live2d/models")
@@ -3138,86 +3190,63 @@ async def scan_local_workshop_items(request: Request):
             # 优先使用get_workshop_path()函数获取路径
             folder_path = base_workshop_folder
             default_path_used = True
-            logger.info(f'未提供文件夹路径，强制使用默认路径: {folder_path}')
+            logger.info(f'未提供文件夹路径，使用默认路径: {folder_path}')
             # 确保默认文件夹存在
             ensure_workshop_folder_exists(folder_path)
         else:
-            # 如果提供了路径，确保它在基础目录内（防止路径遍历攻击）
-            original_path = folder_path
-            # 标准化路径
+            # 用户提供了路径，标准化处理
             folder_path = os.path.normpath(folder_path)
             
-            # 确保路径是绝对路径
+            # 如果是相对路径，基于默认路径解析
             if not os.path.isabs(folder_path):
-                # 如果是相对路径，将其解析为基于基础目录的路径
-                folder_path = os.path.join(base_workshop_folder, folder_path)
+                folder_path = os.path.join(default_workshop_folder, folder_path)
                 folder_path = os.path.normpath(folder_path)
             
-            # 关键安全检查：验证路径是否在基础目录内
-            if not folder_path.startswith(base_workshop_folder):
-                logger.warning(f'路径遍历尝试被拒绝: {original_path}')
-                return JSONResponse(content={"success": False, "error": "访问被拒绝: 路径不在允许的范围内"}, status_code=403)
+            logger.info(f'用户指定路径: {folder_path}')
         
-        logger.info(f'路径标准化后: {folder_path}')
         logger.info(f'最终使用的文件夹路径: {folder_path}, 默认路径使用状态: {default_path_used}')
         
         if not os.path.exists(folder_path):
             logger.warning(f'文件夹不存在: {folder_path}')
-            return JSONResponse(content={"success": False, "error": f"指定的文件夹不存在: {os.path.basename(folder_path)}", "default_path_used": default_path_used}, status_code=404)
+            return JSONResponse(content={"success": False, "error": f"指定的文件夹不存在: {folder_path}", "default_path_used": default_path_used}, status_code=404)
         
         if not os.path.isdir(folder_path):
             logger.warning(f'指定的路径不是文件夹: {folder_path}')
-            return JSONResponse(content={"success": False, "error": f"指定的路径不是文件夹: {os.path.basename(folder_path)}", "default_path_used": default_path_used}, status_code=400)
+            return JSONResponse(content={"success": False, "error": f"指定的路径不是文件夹: {folder_path}", "default_path_used": default_path_used}, status_code=400)
         
         # 扫描本地创意工坊物品
         local_items = []
         published_items = []
         item_id = 1
         
-        # 遍历文件夹，扫描所有子文件夹（不再检查特定文件格式）
+        # 遍历文件夹，扫描所有子文件夹
         for item_folder in os.listdir(folder_path):
             item_path = os.path.join(folder_path, item_folder)
             if os.path.isdir(item_path):
-                # 安全检查：确保子目录仍然在基础目录内
-                if not item_path.startswith(base_workshop_folder):
-                    logger.warning(f'跳过超出基础目录的子文件夹: {item_path}')
-                    continue
-                
-                # 直接添加所有子文件夹，不检查内部文件结构
+                # 直接添加所有子文件夹
                 stat_info = os.stat(item_path)
-                
-                # 计算相对路径，避免返回绝对路径
-                relative_path = os.path.relpath(item_path, base_workshop_folder)
                 
                 # 处理预览图路径（如果有）
                 preview_image = find_preview_image_in_folder(item_path)
-                preview_image_rel = None
-                if preview_image:
-                    # 确保预览图路径也在基础目录内
-                    if preview_image.startswith(base_workshop_folder):
-                        preview_image_rel = os.path.relpath(preview_image, base_workshop_folder)
                 
                 local_items.append({
                     "id": f"local_{item_id}",
                     "name": item_folder,
-                    "path": relative_path,  # 返回相对路径而不是绝对路径
+                    "path": item_path,  # 返回绝对路径
                     "lastModified": stat_info.st_mtime,
                     "size": get_folder_size(item_path),
                     "tags": ["本地文件"],
-                    "previewImage": preview_image_rel  # 返回相对路径
+                    "previewImage": preview_image  # 返回绝对路径
                 })
                 item_id += 1
         
         logger.info(f"扫描完成，找到 {len(local_items)} 个本地创意工坊物品")
         
-        # 计算相对文件夹路径用于返回
-        relative_folder_path = os.path.relpath(folder_path, base_workshop_folder)
-        
         return JSONResponse(content={
             "success": True,
             "local_items": local_items,
             "published_items": published_items,
-            "folder_path": relative_folder_path,  # 返回相对路径
+            "folder_path": folder_path,  # 返回绝对路径
             "default_path_used": default_path_used
         })
         
@@ -4140,6 +4169,14 @@ async def find_first_image(folder: str = None):
             os.path.realpath(os.path.join(base_dir, 'static')),
             os.path.realpath(os.path.join(base_dir, 'assets'))
         ]
+        
+        # 添加"我的文档/Xiao8"目录到允许列表
+        if os.name == 'nt':  # Windows系统
+            documents_path = os.path.join(os.path.expanduser('~'), 'Documents', 'Xiao8')
+            if os.path.exists(documents_path):
+                real_doc_path = os.path.realpath(documents_path)
+                allowed_dirs.append(real_doc_path)
+                logger.info(f"find-first-image: 添加允许的文档目录: {real_doc_path}")
         
         # 解码URL编码的路径
         decoded_folder = unquote(folder)
