@@ -29,6 +29,7 @@ def agent_action(func):
 
 UBUNTU_APP_SETUP = f"""import subprocess;
 import difflib;
+import time;
 import pyautogui;
 pyautogui.press('escape');
 time.sleep(0.2);
