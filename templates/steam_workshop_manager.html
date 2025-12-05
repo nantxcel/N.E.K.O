@@ -78,7 +78,61 @@
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23d5f1ff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
-            padding-right: 35px;
+        }
+        
+        /* 标签样式 */
+        #notes-tags-container, #character-card-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            border: none;
+            border-radius: 0;
+            background-color: transparent;
+            align-items: center;
+        }
+        
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            background-color: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .tag-remove {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 0;
+            margin-left: 4px;
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .tag-remove:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        #workshop-notes-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            outline: none;
+            min-width: 200px;
+            font-size: 14px;
+            padding: 4px 0;
         }
         
         .control-input {
@@ -196,6 +250,9 @@
             margin-top: 20px;
             padding-top: 15px;
             border-top: 1px solid #eaeaea;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         
         .btn-large {
@@ -1777,16 +1834,24 @@
                             
                             <div class="control-group">
                                 <div class="control-label" data-i18n="steam.characterCardTags">角色卡标签</div>
-                                <div class="tags-container" id="character-card-tags-container">
-                                    <!-- 标签将通过JavaScript动态添加 -->
+                                <div id="character-card-tags-wrapper" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+                                    <div class="tags-container" id="character-card-tags-container"></div>
+                                    <input type="text" id="character-card-tag-input" class="control-input" placeholder="输入标签，按空格添加..." style="flex: 1; min-width: 150px; border: none; background: transparent; padding: 4px 0; margin: 0;">
                                 </div>
-                                <input type="text" id="character-card-tag-input" class="control-input" data-i18n-placeholder="steam.placeholderAddTag" placeholder="添加标签" onkeypress="addTag(event, 'character-card')">
+                            </div>
+                            
+                            <div class="control-group">
+                                <div class="control-label" data-i18n="steam.characterNotes">注意事项</div>
+                                <div id="notes-input-container" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+                                    <div id="notes-tags-container" class="tags-container"></div>
+                                    <input type="text" id="workshop-notes-input" placeholder="输入注意事项标签，按空格添加..." class="control-input" style="flex: 1; min-width: 150px; border: none; background: transparent; padding: 4px 0; margin: 0;">
+                                </div>
                             </div>
                         </div>
                         
                         <!-- 右侧预览区域 -->
                         <div class="character-card-preview">
-                            <h3 data-i18n="steam.live2dPreview">Live2D预览</h3>
+                            <h3 data-i18n="steam.live2dPreview">Live2D</h3>
                             <div id="live2d-preview-container" style="width: 100%; height: 300px; border: 1px solid #eaeaea; border-radius: 4px; overflow: hidden; background-color: #f8f8f8;">
                                 <!-- Live2D预览Canvas -->
                                 <canvas id="live2d-preview-canvas" style="display: none; width: 100%; height: 100%;"></canvas>
@@ -1798,7 +1863,7 @@
                             
                             <hr class="fluent-divider">
                             
-                            <h3 data-i18n="steam.cardInfoPreview">角色卡信息预览</h3>
+                            <h3 data-i18n="steam.cardInfoPreview">角色卡信息</h3>
                             <div id="card-info-preview" style="padding: 12px; border: 1px solid #eaeaea; border-radius: 4px; background-color: #f8f8f8;">
                                 <h4 id="preview-card-name" style="margin-top: 0; color: #222; font-weight: 500;">-</h4>
                                 <p id="preview-card-description" style="color: #555; margin-bottom: 8px;">-</p>
@@ -1807,20 +1872,34 @@
                             
                             <hr class="fluent-divider">
                             
-                            <h3 data-i18n="steam.tagsPreview">标签预览</h3>
+                            <h3 data-i18n="steam.tagsPreview">标签</h3>
                             <div id="tags-preview" style="padding: 12px; border: 1px solid #eaeaea; border-radius: 4px; background-color: #f8f8f8;">
                                 <div class="tags-container" id="preview-tags-container">
                                     <!-- 标签预览将在这里显示 -->
                                 </div>
                             </div>
                             
+                            <h3 data-i18n="steam.notesPreview">注意事项</h3>
+                            <div id="notes-preview" style="padding: 12px; border: 1px solid #eaeaea; border-radius: 4px; background-color: #f8f8f8;">
+                                <div class="tags-container" id="preview-notes-container">
+                                    <!-- 注意事项预览将在这里显示 -->
+                                </div>
+                            </div>
+                            
                             <div class="save-button-container">
-                                <button class="btn btn-primary btn-large" onclick="saveCharacterCard()" data-i18n="common.save">保存角色卡</button>
+                                <button class="btn btn-success" onclick="saveCharacterCard()" style="flex: 1; padding: 12px 0; font-size: 16px;">
+                                    💾 <span data-i18n="common.save">保存角色卡</span>
+                                </button>
+                                <button class="btn btn-primary" onclick="toggleUploadSection()" style="flex: 1; padding: 12px 0; font-size: 16px;">
+                                    🚀 <span data-i18n="steam.uploadToWorkshop">上传到创意工坊</span>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
                 
+
+
                 <div class="section-card">
                     <div class="section-header">
                          <h2 data-i18n="steam.characterCardsList">角色卡列表</h2>
@@ -1834,6 +1913,8 @@
                         </div>
                     </div>
                 </div>
+                
+
             </div>
         </div>
         
@@ -3675,8 +3756,8 @@ function viewItemDetails(itemId) {
         // 初始化页面
         window.onload = function() {
             // 初始化时添加一些示例标签
-            addTag(window.t ? window.t('steam.defaultTagMod') : 'Mod');
-            addTag(window.t ? window.t('steam.defaultTagCharacter') : 'Character');
+            addTag('character-card', window.t ? window.t('steam.defaultTagMod') : 'Mod');
+            addTag('character-card', window.t ? window.t('steam.defaultTagCharacter') : 'Character');
             
             // 初始化i18n文本
             if (document.getElementById('loading-text')) {
@@ -3940,6 +4021,26 @@ function viewItemDetails(itemId) {
             });
         }
         
+        // 更新注意事项标签预览
+        window.updateNotesPreview = function() {
+            const originalNotes = document.querySelectorAll('#notes-tags-container .tag');
+            const previewContainer = document.getElementById('preview-notes-container');
+            
+            // 确保预览容器存在
+            if (!previewContainer) return;
+            
+            // 清空预览容器
+            previewContainer.innerHTML = '';
+            
+            // 复制注意事项标签到预览容器
+            originalNotes.forEach(note => {
+                const newNote = document.createElement('span');
+                newNote.className = 'tag';
+                newNote.textContent = note.textContent.replace('×', '');
+                previewContainer.appendChild(newNote);
+            });
+        }
+        
         // 为输入字段添加事件监听器，自动更新预览
         document.addEventListener('DOMContentLoaded', function() {
             const nameInput = document.getElementById('character-card-name');
@@ -3986,35 +4087,62 @@ function viewItemDetails(itemId) {
         }
         
         // 添加标签
-        function addTag(event, type) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                const tagInput = event.target;
-                const tagText = tagInput.value.trim();
+        function addTag(type, tagValue) {
+            const tagInput = document.getElementById(`${type}-tag-input`);
+            const tagText = tagValue.trim();
+            
+            if (tagText) {
+                const tagsContainer = document.getElementById(`${type}-tags-container`);
                 
-                if (tagText) {
-                    const tagsContainer = document.getElementById(`${type}-tags-container`);
+                // 检查标签数量是否超过限制（最多4个）
+                const existingTags = tagsContainer.querySelectorAll('.tag');
+                if (existingTags.length >= 4) {
+                    alert('标签数量不能超过4个！');
+                    return;
+                }
+                
+                // 检查标签字数是否超过限制（最多30字）
+                if (tagText.length > 30) {
+                    alert('标签字数不能超过30字！');
+                    return;
+                }
+                
+                // 检查标签是否已存在
+                const tagTexts = Array.from(existingTags).map(tag => 
+                    tag.textContent.replace('×', '').trim()
+                );
+                if (!tagTexts.includes(tagText)) {
+                    // 创建新标签
+                    const tagElement = document.createElement('div');
+                    tagElement.className = 'tag';
+                    tagElement.innerHTML = `${tagText}<span class="tag-remove" onclick="removeTag(this, '${type}')">×</span>`;
+                    tagsContainer.appendChild(tagElement);
                     
-                    // 检查标签是否已存在
-                    const existingTags = Array.from(tagsContainer.querySelectorAll('.tag span:first-child')).map(tag => tag.textContent.trim());
-                    if (!existingTags.includes(tagText)) {
-                        // 创建新标签
-                        const tagElement = document.createElement('div');
-                        tagElement.className = 'tag';
-                        tagElement.innerHTML = `${tagText}<span class="tag-remove" onclick="removeTag(this, '${type}')">×</span>`;
-                        tagsContainer.appendChild(tagElement);
-                        
-                        // 清空输入框
-                        tagInput.value = '';
-                        
-                        // 更新标签预览
-                        if (type === 'character-card') {
-                            updateTagsPreview();
-                        }
+                    // 更新标签预览
+                    if (type === 'character-card') {
+                        updateTagsPreview();
                     }
                 }
             }
         }
+        
+        // 处理角色卡标签输入框变化
+        document.addEventListener('DOMContentLoaded', function() {
+            const characterTagInput = document.getElementById('character-card-tag-input');
+            
+            if (characterTagInput) {
+                characterTagInput.addEventListener('input', function() {
+                    const inputValue = this.value;
+                    
+                    // 当输入空格时添加标签
+                    if (inputValue.endsWith(' ')) {
+                        const tagValue = inputValue.trim();
+                        addTag('character-card', tagValue);
+                        this.value = '';
+                    }
+                });
+            }
+        });
         
         // 移除标签
         function removeTag(tagElement, type) {
@@ -4123,6 +4251,83 @@ function viewItemDetails(itemId) {
             // 延迟初始化，确保其他资源已加载
             setTimeout(initLive2DPreview, 1000);
         });
+        
+        // 注意事项标签功能
+        (function() {
+            const tagsContainer = document.getElementById('notes-tags-container');
+            const notesInput = document.getElementById('workshop-notes-input');
+            let notesTags = [];
+            
+            // 渲染标签
+            function renderTags() {
+                tagsContainer.innerHTML = '';
+                notesTags.forEach((tag, index) => {
+                    const tagElement = document.createElement('span');
+                    tagElement.className = 'tag';
+                    tagElement.innerHTML = `
+                        <span>${tag}</span>
+                        <button class="tag-remove" onclick="removeNotesTag(${index})" title="删除标签">
+                            <span>×</span>
+                        </button>
+                    `;
+                    tagsContainer.appendChild(tagElement);
+                });
+                updateNotesPreview(); // 更新预览，移到循环外部确保无论是否有标签都会执行
+            }
+            
+            // 添加标签
+            function addNotesTag(tagValue) {
+                if (tagValue && tagValue.trim()) {
+                    const tag = tagValue.trim();
+                    
+                    // 检查标签数量是否超过限制（最多4个）
+                    if (notesTags.length >= 4) {
+                        alert('标签数量不能超过4个！');
+                        return;
+                    }
+                    
+                    // 检查标签字数是否超过限制（最多30字）
+                    if (tag.length > 30) {
+                        alert('标签字数不能超过30字！');
+                        return;
+                    }
+                    
+                    // 去重
+                    if (!notesTags.includes(tag)) {
+                        notesTags.push(tag);
+                        renderTags();
+                    }
+                }
+            }
+            
+            // 删除标签
+            window.removeNotesTag = function(index) {
+                notesTags.splice(index, 1);
+                renderTags();
+            }
+            
+            // 处理输入框变化
+            function handleInput() {
+                const inputValue = notesInput.value;
+                
+                // 当输入空格时添加标签
+                if (inputValue.endsWith(' ')) {
+                    const tagValue = inputValue.trim();
+                    addNotesTag(tagValue);
+                    notesInput.value = '';
+                }
+            }
+            
+            // 监听输入变化，按空格添加标签
+            if (notesInput) {
+                notesInput.addEventListener('input', handleInput);
+            }
+            
+            // 导出addNotesTag函数供外部使用
+            window.addNotesTag = addNotesTag;
+        })();
+        
+
     </script>
     
     <!-- Live2D核心库和依赖 -->

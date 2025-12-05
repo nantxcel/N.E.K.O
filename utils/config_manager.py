@@ -887,7 +887,7 @@ class ConfigManager:
             else:
                 # 如果配置文件不存在，返回默认配置
                 default_config = {
-                    "default_workshop_folder": str(self.workshop_dir),
+                    "default_workshop_path": str(self.workshop_dir),
                     "auto_create_folder": True
                 }
                 logger.info(f"创建默认workshop配置: {default_config}")
@@ -898,7 +898,7 @@ class ConfigManager:
             print(error_msg)
             # 使用默认配置
             return {
-                "default_workshop_folder": str(self.workshop_dir),
+                "default_workshop_path": str(self.workshop_dir),
                 "auto_create_folder": True
             }
     
@@ -933,7 +933,7 @@ class ConfigManager:
             workshop_path: workshop根目录路径
         """
         config = self.load_workshop_config()
-        config["WORKSHOP_PATH"] = workshop_path
+        config["steam_workshop_path"] = workshop_path
         self.save_workshop_config(config)
         logger.info(f"已将workshop路径保存到配置文件: {workshop_path}")
     
@@ -945,8 +945,8 @@ class ConfigManager:
             str: workshop根目录路径
         """
         config = self.load_workshop_config()
-        # 优先使用user_mod_folder，然后是WORKSHOP_PATH，然后是default_workshop_folder，最后使用self.workshop_dir
-        return config.get("user_mod_folder", config.get("WORKSHOP_PATH", config.get("default_workshop_folder", str(self.workshop_dir))))
+        # 优先使用user_mod_folder，然后是steam_workshop_path，然后是default_workshop_path，最后使用self.workshop_dir
+        return config.get("user_mod_folder", config.get("steam_workshop_path", config.get("default_workshop_path", str(self.workshop_dir))))
 
 
 # 全局配置管理器实例
