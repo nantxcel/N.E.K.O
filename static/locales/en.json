@@ -44,6 +44,8 @@
     "selectModelToPreview": "Please select a model to preview",
     "characterCardsList": "Character Cards List",
     "selectModel": "Select Model",
+    "scanModels": "Scan Models",
+    "uploadModel": "Upload Model",
     "dropModelFolder": "Drop Live2D model folder here",
     "orClickToBrowse": "or click to browse",
     "modelFolderSelected": "Model folder selected",

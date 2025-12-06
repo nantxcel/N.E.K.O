@@ -3661,7 +3661,7 @@ async def scan_local_workshop_items(request: Request):
                 })
                 item_id += 1
         
-        logger.info(f"扫描完成，找到 {len(local_items)} 个本地创意工坊物品")
+        logger.info(f"扫描完成，找到 {len(local_items)} 个本地物品")
         
         return JSONResponse(content={
             "success": True,

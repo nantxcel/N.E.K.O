@@ -1816,18 +1816,24 @@
                             <div class="control-group">
                                 <div class="control-label" data-i18n="steam.characterCardModel">选择Live2D模型</div>
                                 <div id="character-card-model-selection">
-                                    <!-- 拖放文件夹区域 -->
-                                    <div id="model-drop-area" class="model-drop-area">
-                                        <div class="drop-area-content">
-                                            <div class="drop-icon">📁</div>
-                                            <p data-i18n="steam.dropModelFolder">将Live2D模型文件夹拖放到此处</p>
-                                            <p class="drop-hint" data-i18n="steam.orClickToBrowse">或点击浏览选择</p>
-                                            <input type="file" id="model-file-input" class="model-file-input" webkitdirectory directory multiple style="display: none;">
+                                    <!-- 模型扫描和选择区域 -->
+                                    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                                        <div style="position: relative; flex: 1; cursor: pointer;">
+                                            <select id="model-select" class="control-input" style="width: 100%; appearance: none; padding-right: 25px; cursor: pointer;" data-i18n-placeholder="steam.selectModel" placeholder="选择模型">
+                                                <option value="" disabled selected>请先扫描模型</option>
+                                            </select>
+                                            <div style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #666;">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M6 9l6 6 6-6"/>
+                                                </svg>
+                                            </div>
                                         </div>
+                                        <button class="btn btn-primary" onclick="scanModels()" data-i18n="steam.scanModels">扫描模型</button>
+                                        <input type="file" id="model-upload-input" style="display: none;" webkitdirectory directory multiple />
+                                        <button class="btn btn-success" onclick="document.getElementById('model-upload-input').click()" data-i18n="steam.uploadModel">上传模型</button>
                                     </div>
                                     <div id="selected-model-info" style="margin-top: 10px; display: none;">
                                         <p id="selected-model-name"></p>
-                                        <button class="btn btn-danger btn-sm" onclick="clearSelectedModel()" data-i18n="common.remove">移除</button>
                                     </div>
                                 </div>
                             </div>
@@ -2113,6 +2119,11 @@
                 if (uploadFormSection) {
                     uploadFormSection.style.display = 'none';
                 }
+            }
+            
+            // 如果切换到角色卡页面，自动执行模型扫描
+            if (tabId === 'character-cards-content') {
+                scanModels();
             }
         }
         
@@ -3778,6 +3789,12 @@ function viewItemDetails(itemId) {
             
             // 页面加载时自动加载角色卡
             loadCharacterCards();
+            
+            // 初始化模型选择功能
+            initModelSelection();
+            
+            // 添加模型上传文件选择事件监听
+            document.getElementById('model-upload-input').addEventListener('change', handleModelUpload);
         };
         
         // 角色卡相关函数
@@ -3881,98 +3898,117 @@ function viewItemDetails(itemId) {
             showNotification('编辑角色卡功能待实现', 'info');
         }
         
-        // 打开模型选择器（兼容旧代码）
-        function openModelSelector() {
-            document.getElementById('model-file-input').click();
+        // 扫描Live2D模型
+        function scanModels() {
+            showMessage(window.t ? window.t('steam.scanningModels') : '正在扫描模型...', 'info');
+            
+            // 调用API获取模型列表
+            fetch('/api/live2d/models')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP错误，状态码: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(models => {
+                const modelSelect = document.getElementById('model-select');
+                
+                // 清空下拉列表
+                modelSelect.innerHTML = '';
+                
+                // 添加默认选项
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = window.t ? window.t('steam.selectModel') : '选择模型';
+                defaultOption.disabled = true;
+                defaultOption.selected = true;
+                modelSelect.appendChild(defaultOption);
+                
+                // 添加扫描到的模型
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.name;
+                    option.textContent = model.name;
+                    modelSelect.appendChild(option);
+                });
+                
+                showMessage(window.t ? window.t('steam.modelsScanned') : '模型扫描完成', 'success');
+            })
+            .catch(error => {
+                console.error('扫描模型失败:', error);
+                showMessage(window.t ? window.t('steam.scanError') : '扫描模型失败', 'error');
+            });
         }
         
-        // 初始化模型拖放区域
-        function initModelDropArea() {
-            const dropArea = document.getElementById('model-drop-area');
-            const fileInput = document.getElementById('model-file-input');
-            
-            // 点击区域打开文件选择
-            dropArea.addEventListener('click', () => {
-                fileInput.click();
-            });
-            
-            // 拖放事件处理
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, preventDefaults, false);
-            });
-            
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropArea.addEventListener(eventName, highlight, false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, unhighlight, false);
-            });
-            
-            function highlight() {
-                dropArea.classList.add('dragover');
-            }
-            
-            function unhighlight() {
-                dropArea.classList.remove('dragover');
-            }
-            
-            // 处理文件选择
-            dropArea.addEventListener('drop', handleDrop, false);
-            fileInput.addEventListener('change', handleFiles, false);
-            
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                handleFiles(files);
-            }
-            
-            function handleFiles(files) {
-                // 如果是FileList对象，转换为数组
-                const fileArray = files instanceof FileList ? Array.from(files) : files;
+        // 处理模型上传
+        function handleModelUpload(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+
+            showMessage(window.t ? window.t('steam.uploadingModel') : '正在上传模型...', 'info');
+
+            try {
+                const formData = new FormData();
                 
-                // 确保只处理文件夹
-                const folders = fileArray.filter(file => file.webkitRelativePath && file.webkitRelativePath.split('/').length > 1);
-                
-                if (folders.length > 0) {
-                    // 获取第一个文件夹的路径
-                    const firstFolder = folders[0].webkitRelativePath.split('/')[0];
-                    
-                    // 验证是否为有效的Live2D模型文件夹
-                    if (isValidLive2DModel(folders)) {
-                        // 更新选中模型信息
-                        const selectedModelName = document.getElementById('selected-model-name');
-                        const selectedModelInfo = document.getElementById('selected-model-info');
-                        
-                        selectedModelName.textContent = firstFolder;
-                        selectedModelInfo.style.display = 'block';
-                        
-                        showNotification(window.t('steam.modelFolderSelected'), 'success');
-                        
-                        // 加载Live2D模型进行预览
-                        loadLive2DModelFromFolder(folders);
-                    } else {
-                        showNotification(window.t('steam.invalidModelFolder'), 'error');
-                    }
-                } else {
-                    showNotification(window.t('steam.selectModelFolder'), 'error');
+                // 添加所有文件到FormData
+                for (const file of files) {
+                    // 保留文件的相对路径
+                    formData.append('files', file, file.webkitRelativePath || file.name);
                 }
+
+                fetch('/api/live2d/upload_model', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误，状态码: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    if (result.success) {
+                        showMessage(window.t ? window.t('steam.uploadSuccess') : '模型上传成功！', 'success');
+                        // 重新扫描模型列表
+                        scanModels();
+                    } else {
+                        showMessage(window.t ? window.t('steam.uploadError', {error: result.error}) : `上传出错: ${result.error}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('上传模型失败:', error);
+                    showMessage(window.t ? window.t('steam.uploadError', {error: error.message}) : `上传出错: ${error.message}`, 'error');
+                })
+                .finally(() => {
+                    // 清空文件选择
+                    event.target.value = '';
+                });
+            } catch (error) {
+                console.error('上传模型失败:', error);
+                showMessage(window.t ? window.t('steam.uploadError', {error: error.message}) : `上传出错: ${error.message}`, 'error');
+                // 清空文件选择
+                event.target.value = '';
             }
+        }
+        
+        // 初始化模型选择功能
+        function initModelSelection() {
+            const modelSelect = document.getElementById('model-select');
             
-            function isValidLive2DModel(files) {
-                // 检查是否包含必要的Live2D模型文件
-                const requiredExtensions = ['.model3.json', '.moc3'];
-                const fileNames = files.map(file => file.name.toLowerCase());
-                
-                return requiredExtensions.some(ext => 
-                    fileNames.some(name => name.endsWith(ext))
-                );
-            }
+            // 添加模型选择事件监听
+            modelSelect.addEventListener('change', () => {
+                const selectedModelName = modelSelect.value;
+                if (selectedModelName) {
+                    const infoDiv = document.getElementById('selected-model-info');
+                    const nameP = document.getElementById('selected-model-name');
+                    
+                    nameP.textContent = selectedModelName;
+                    infoDiv.style.display = 'block';
+                    
+                    // 可以在这里添加加载模型预览的逻辑
+                    // loadLive2DModelByName(selectedModelName);
+                }
+            });
         }
         
         // 清空角色卡表单
@@ -4059,8 +4095,7 @@ function viewItemDetails(itemId) {
                 settingInput.addEventListener('input', updateCardPreview);
             }
             
-            // 初始化模型拖放区域
-            initModelDropArea();
+    
         });
             
         
@@ -4069,9 +4104,13 @@ function viewItemDetails(itemId) {
         function clearSelectedModel() {
             const selectedModelInfo = document.getElementById('selected-model-info');
             const selectedModelName = document.getElementById('selected-model-name');
+            const modelSelect = document.getElementById('model-select');
             
             selectedModelName.textContent = '';
             selectedModelInfo.style.display = 'none';
+            
+            // 重置下拉列表选择
+            modelSelect.selectedIndex = 0;
             
             // 清除Live2D预览
             if (currentPreviewModel) {

@@ -44,6 +44,8 @@
     "confirmClearNotes": "确定要清空所有注意事项吗？",
     "notesCleared": "注意事项已清空",
     "selectModel": "选择模型",
+    "scanModels": "扫描模型",
+    "uploadModel": "上传模型",
     "dropModelFolder": "将Live2D模型文件夹拖放到此处",
     "orClickToBrowse": "或点击浏览选择",
     "modelFolderSelected": "模型文件夹已选择",
