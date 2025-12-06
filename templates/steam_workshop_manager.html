@@ -1830,7 +1830,7 @@
                                         </div>
                                         <button class="btn btn-primary" onclick="scanModels()" data-i18n="steam.scanModels">扫描模型</button>
                                         <input type="file" id="model-upload-input" style="display: none;" webkitdirectory directory multiple />
-                                        <button class="btn btn-success" onclick="document.getElementById('model-upload-input').click()" data-i18n="steam.uploadModel">上传模型</button>
+                                        <button class="btn btn-success" onclick="document.getElementById('model-upload-input').click()" data-i18n="steam.uploadModel">导入模型</button>
                                     </div>
                                     <div id="selected-model-info" style="margin-top: 10px; display: none;">
                                         <p id="selected-model-name"></p>
@@ -3945,7 +3945,7 @@ function viewItemDetails(itemId) {
             const files = Array.from(event.target.files);
             if (files.length === 0) return;
 
-            showMessage(window.t ? window.t('steam.uploadingModel') : '正在上传模型...', 'info');
+            showMessage(window.t ? window.t('steam.uploadingModel') : '正在导入模型...', 'info');
 
             try {
                 const formData = new FormData();
@@ -3968,24 +3968,24 @@ function viewItemDetails(itemId) {
                 })
                 .then(result => {
                     if (result.success) {
-                        showMessage(window.t ? window.t('steam.uploadSuccess') : '模型上传成功！', 'success');
+                        showMessage(window.t ? window.t('steam.uploadSuccess') : '模型导入成功！', 'success');
                         // 重新扫描模型列表
                         scanModels();
                     } else {
-                        showMessage(window.t ? window.t('steam.uploadError', {error: result.error}) : `上传出错: ${result.error}`, 'error');
+                        showMessage(window.t ? window.t('steam.uploadError', {error: result.error}) : `导入出错: ${result.error}`, 'error');
                     }
                 })
                 .catch(error => {
-                    console.error('上传模型失败:', error);
-                    showMessage(window.t ? window.t('steam.uploadError', {error: error.message}) : `上传出错: ${error.message}`, 'error');
+                    console.error('导入模型失败:', error);
+                    showMessage(window.t ? window.t('steam.uploadError', {error: error.message}) : `导入出错: ${error.message}`, 'error');
                 })
                 .finally(() => {
                     // 清空文件选择
                     event.target.value = '';
                 });
             } catch (error) {
-                console.error('上传模型失败:', error);
-                showMessage(window.t ? window.t('steam.uploadError', {error: error.message}) : `上传出错: ${error.message}`, 'error');
+                console.error('导入模型失败:', error);
+                showMessage(window.t ? window.t('steam.uploadError', {error: error.message}) : `导入出错: ${error.message}`, 'error');
                 // 清空文件选择
                 event.target.value = '';
             }
